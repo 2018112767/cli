@@ -2,8 +2,10 @@ package container
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/docker/cli/cli"
@@ -21,6 +23,9 @@ type startOptions struct {
 	detachKeys    string
 	checkpoint    string
 	checkpointDir string
+	LazyPages     bool
+	ShellJob      bool
+	TcpConnect    bool
 
 	containers []string
 }
@@ -44,6 +49,10 @@ func NewStartCommand(dockerCli command.Cli) *cobra.Command {
 	flags.BoolVarP(&opts.openStdin, "interactive", "i", false, "Attach container's STDIN")
 	flags.StringVar(&opts.detachKeys, "detach-keys", "", "Override the key sequence for detaching a container")
 
+	flags.BoolVar(&opts.TcpConnect, "tcp-established", false, "tcp-established is used to tcp-established live migration")
+	flags.BoolVar(&opts.LazyPages, "lazy-pages", false, "Lazy-pages is used to post-copy live migration")
+	flags.BoolVar(&opts.ShellJob, "shell-job", false, "Shell-job is used to migrate terminal live migration")
+
 	flags.StringVar(&opts.checkpoint, "checkpoint", "", "Restore from this checkpoint")
 	flags.SetAnnotation("checkpoint", "experimental", nil)
 	flags.SetAnnotation("checkpoint", "ostype", []string{"linux"})
@@ -57,6 +66,28 @@ func NewStartCommand(dockerCli command.Cli) *cobra.Command {
 func runStart(dockerCli command.Cli, opts *startOptions) error {
 	ctx, cancelFun := context.WithCancel(context.Background())
 	defer cancelFun()
+
+	if opts.checkpointDir != "" {
+		data := make(map[string]string)
+		if opts.LazyPages {
+			data["lazy-pages"] = "true"
+		}
+		if opts.TcpConnect {
+			data["tcp-connect"] = "true"
+		}
+		if opts.ShellJob {
+			data["shell-job"] = "true"
+		}
+		file, err := os.Create(opts.checkpointDir + "/restore_parameter.log")
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		encoder := json.NewEncoder(file)
+		if err := encoder.Encode(data); err != nil {
+			return err
+		}
+	}
 
 	if opts.attach || opts.openStdin {
 		// We're going to attach to a container.
@@ -168,6 +199,9 @@ func runStart(dockerCli command.Cli, opts *startOptions) error {
 		startOptions := types.ContainerStartOptions{
 			CheckpointID:  opts.checkpoint,
 			CheckpointDir: opts.checkpointDir,
+			LazyPages:     opts.LazyPages,
+			TcpConnect:    opts.TcpConnect,
+			ShellJob:      opts.ShellJob,
 		}
 		return dockerCli.Client().ContainerStart(ctx, container, startOptions)
 
