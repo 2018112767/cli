@@ -19,6 +19,7 @@ type createOptions struct {
 	preDump       bool
 	tcpConnect    bool
 	shellJob      bool
+	pageServer    string
 }
 
 func newCreateCommand(dockerCli command.Cli) *cobra.Command {
@@ -40,6 +41,7 @@ func newCreateCommand(dockerCli command.Cli) *cobra.Command {
 	flags.BoolVar(&opts.preDump, "pre-dump", false, "Pre-dump is used to pre-copy live migration")
 	flags.StringVarP(&opts.parentPath, "parent-path", "", "", "Parent-Path is the path of last iteration dump image")
 	flags.StringVarP(&opts.checkpointDir, "checkpoint-dir", "", "", "Use a custom checkpoint storage directory")
+	flags.StringVarP(&opts.pageServer, "page-server", "", "", "Page-server is the IP:Port of page server")
 	flags.BoolVar(&opts.tcpConnect, "tcp-established", false, "tcp-established is used to tcp-established live migration")
 	flags.BoolVar(&opts.shellJob, "shell-job", false, "Shell-job is used to migrate terminal live migration")
 	return cmd
@@ -56,6 +58,7 @@ func runCreate(dockerCli command.Cli, opts createOptions) error {
 		Exit:          !opts.leaveRunning,
 		TcpConnect:    opts.tcpConnect,
 		ShellJob:      opts.shellJob,
+		PageServer:    opts.pageServer,
 	}
 
 	err := client.CheckpointCreate(context.Background(), opts.container, checkpointOpts)
